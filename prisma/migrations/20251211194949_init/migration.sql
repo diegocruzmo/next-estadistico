@@ -1,0 +1,33 @@
+-- CreateTable
+CREATE TABLE "Report" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "month" TEXT NOT NULL,
+    "year" TEXT NOT NULL,
+    "territorial" TEXT NOT NULL,
+    "numcvm" INTEGER NOT NULL,
+    "numcvf" INTEGER NOT NULL,
+    "numcvtm" INTEGER NOT NULL,
+    "numcvtf" INTEGER NOT NULL,
+    "numcvnb" INTEGER NOT NULL,
+    "numcvlg" INTEGER NOT NULL,
+    "numcvin" INTEGER NOT NULL,
+    "numcpm" INTEGER NOT NULL,
+    "numcpf" INTEGER NOT NULL,
+    "numcptm" INTEGER NOT NULL,
+    "numcptf" INTEGER NOT NULL,
+    "numcpnb" INTEGER NOT NULL,
+    "numcplg" INTEGER NOT NULL,
+    "numcpin" INTEGER NOT NULL,
+    "numqrm" INTEGER NOT NULL,
+    "numqrf" INTEGER NOT NULL,
+    "numqrtm" INTEGER NOT NULL,
+    "numqrtf" INTEGER NOT NULL,
+    "numqrnb" INTEGER NOT NULL,
+    "numqrlg" INTEGER NOT NULL,
+    "numqrin" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Report_pkey" PRIMARY KEY ("id")
+);

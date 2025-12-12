@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Report {
+  id            String   @id @default(uuid())
+  userId        String
+
+  month         String   @db.Text
+  year          String   @db.Text
+  territorial   String   @db.Text
+
+  numcvm        Int
+  numcvf        Int
+  numcvtm       Int
+  numcvtf       Int
+  numcvnb       Int
+  numcvlg       Int
+  numcvin       Int  
+
+  numcpm        Int
+  numcpf        Int
+  numcptm       Int
+  numcptf       Int
+  numcpnb       Int
+  numcplg       Int
+  numcpin       Int 
+
+  numqrm        Int
+  numqrf        Int
+  numqrtm       Int
+  numqrtf       Int
+  numqrnb       Int
+  numqrlg       Int
+  numqrin       Int   
+
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

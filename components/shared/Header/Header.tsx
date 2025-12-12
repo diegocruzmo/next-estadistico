@@ -1,9 +1,15 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import ModeToggle from "../ModeToggle";
 import { UserButton } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
+import { useTheme } from "next-themes";
 
 export default function Header() {
+  const { theme } = useTheme();
+
   return (
     <header className="w-full bg-gray-100 dark:bg-gray-900 shadow-sm border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -23,7 +29,11 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          <UserButton />
+          <UserButton
+            appearance={{
+              baseTheme: theme === "dark" ? dark : undefined,
+            }}
+          />
           <ModeToggle />
         </div>
       </div>
