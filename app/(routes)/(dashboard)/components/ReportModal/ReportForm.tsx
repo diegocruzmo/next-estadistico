@@ -71,7 +71,7 @@ function NumberField<TValues>({
             }
             field.onChange(num);
           }}
-          className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
+          className="input input-bordered w-full rounded-md border px-2 py-1 text-sm placeholder:text-xs"
         />
       </FormControl>
       <FormMessage />
@@ -268,8 +268,8 @@ export default function ReportForm({
 }) {
   /** Paso 1: Filtros */
   const stepFiltros: WizardStep = {
-    id: "filtros",
-    title: "Filtros",
+    id: "informacion",
+    title: "Información",
     description: "Selecciona territorial, año y mes",
     fields: ["territorial", "anio", "mes"],
     content: (
@@ -408,12 +408,7 @@ export default function ReportForm({
     fields: VERBALES_FIELDS.map((f) => f.name),
     content: (
       <>
-        <h2 className="text-lg">Verbales</h2>
-        <h3 className="text-gray-600 dark:text-gray-400">
-          Número de Consultas
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {VERBALES_FIELDS.map(({ name, label }) => (
             <FormField
               key={name}
@@ -443,14 +438,7 @@ export default function ReportForm({
     fields: CONMINACION_FIELDS.map((f) => f.name),
     content: (
       <>
-        <h2 className="text-lg">
-          Conminación a Dar Cumplimiento al Procedimiento de Acoso Laboral
-        </h2>
-        <h3 className="text-gray-600 dark:text-gray-400">
-          Número de Consultas
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {CONMINACION_FIELDS.map(({ name, label }) => (
             <FormField
               key={name}
@@ -480,12 +468,7 @@ export default function ReportForm({
     fields: PIVC_FIELDS.map((f) => f.name),
     content: (
       <>
-        <h2 className="text-lg">Querellas remitidas a PIVC</h2>
-        <h3 className="text-gray-600 dark:text-gray-400">
-          Número de Consultas
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {PIVC_FIELDS.map(({ name, label }) => (
             <FormField
               key={name}
@@ -516,7 +499,7 @@ export default function ReportForm({
 
   /** Validación por paso (solo los campos del paso actual) */
   const validateStep = async (fields: string[]) => {
-    const ok = await form.trigger(fields, { shouldFocus: true });
+    const ok = await form.trigger(fields as any, { shouldFocus: true });
     return ok;
   };
 
