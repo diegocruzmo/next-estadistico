@@ -114,18 +114,6 @@ export default function ReportModal() {
             className="space-y-4"
           >
             <ReportForm form={form} />
-
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline" className="cursor-pointer">
-                  Cancelar
-                </Button>
-              </DialogClose>
-
-              <Button type="submit" className="cursor-pointer">
-                Guardar
-              </Button>
-            </DialogFooter>
           </form>
         </Form>
       </DialogContent>

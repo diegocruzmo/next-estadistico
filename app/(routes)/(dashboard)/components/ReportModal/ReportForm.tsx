@@ -1,5 +1,8 @@
 "use client";
 
+import { UseFormReturn } from "react-hook-form";
+import { z } from "zod";
+
 import {
   FormControl,
   FormField,
@@ -16,22 +19,261 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { UseFormReturn } from "react-hook-form";
-import { z } from "zod";
-
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { formSchema } from "./ReportModal";
-import { Separator } from "@/components/ui/separator";
 
 type ReportFormValues = z.infer<typeof formSchema>;
 
+/** ----------------------------------------------------------------------
+ * Helper: NumberField (input numérico reutilizable)
+ * - Evita NaN
+ * - Permite vacío -> undefined
+ * - Aplica min=0
+ * ------------------------------------------------------------------- */
+function NumberField<TValues>({
+  field,
+  label,
+  required = false,
+  placeholder = "Ingrese un valor",
+  min,
+}: {
+  field: any; // ControllerRenderProps<TValues, any>
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  min?: number;
+}) {
+  return (
+    <FormItem>
+      <FormLabel>
+        {label}
+        {required ? <span className="text-red-500">*</span> : null}
+      </FormLabel>
+      <FormControl>
+        <input
+          placeholder={placeholder}
+          type="number"
+          value={field.value ?? ""}
+          min={min}
+          inputMode="numeric"
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === "") {
+              field.onChange(undefined);
+              return;
+            }
+            const num = Number(raw);
+            if (Number.isNaN(num)) return;
+            if (typeof min === "number" && num < min) {
+              field.onChange(min);
+              return;
+            }
+            field.onChange(num);
+          }}
+          className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
+/** ----------------------------------------------------------------------
+ * Helper: Totales de sección (suma en vivo)
+ * ------------------------------------------------------------------- */
+import { useWatch } from "react-hook-form";
+function SectionTotal({
+  form,
+  names,
+  label = "Total",
+}: {
+  form: UseFormReturn<any>;
+  names: string[];
+  label?: string;
+}) {
+  const values = useWatch({ control: form.control, name: names });
+  const total = (values ?? []).reduce(
+    (acc: number, v: unknown) => acc + (typeof v === "number" ? v : 0),
+    0
+  );
+  return (
+    <div className="mt-4 flex items-center justify-end">
+      <div className="text-sm text-muted-foreground">
+        {label}: <span className="font-semibold">{total}</span>
+      </div>
+    </div>
+  );
+}
+
+/** ----------------------------------------------------------------------
+ * Wizard (stepper y navegación)
+ * ------------------------------------------------------------------- */
+import { ReactNode, useMemo, useState } from "react";
+
+type WizardStep = {
+  id: string;
+  title: string;
+  description?: string;
+  fields: string[];
+  content: ReactNode;
+};
+
+function Wizard({
+  steps,
+  initialStep = 0,
+  onValidateStep,
+}: {
+  steps: WizardStep[];
+  initialStep?: number;
+  onValidateStep?: (fields: string[]) => Promise<boolean>;
+}) {
+  const [current, setCurrent] = useState(initialStep);
+  const total = steps.length;
+  const step = steps[current];
+
+  const progress = useMemo(() => {
+    if (total <= 1) return 100;
+    return Math.round(((current + 1) / total) * 100);
+  }, [current, total]);
+
+  const goPrev = () => setCurrent((c) => Math.max(0, c - 1));
+  const goNext = async () => {
+    const fields = step.fields ?? [];
+    if (onValidateStep) {
+      const ok = await onValidateStep(fields);
+      if (!ok) return;
+    }
+    setCurrent((c) => Math.min(total - 1, c + 1));
+  };
+
+  const isLast = current === total - 1;
+
+  return (
+    <div className="space-y-6">
+      {/* Header / Stepper */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">{step.title}</h2>
+            {step.description ? (
+              <p className="text-sm text-muted-foreground">
+                {step.description}
+              </p>
+            ) : null}
+          </div>
+          <span className="text-sm text-muted-foreground">
+            Paso {current + 1} de {total}
+          </span>
+        </div>
+        <Progress value={progress} />
+        <div className="flex flex-wrap gap-2">
+          {steps.map((s, idx) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`px-3 py-1 rounded-md border text-sm ${
+                idx === current
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+              aria-current={idx === current ? "step" : undefined}
+              onClick={() => setCurrent(idx)}
+            >
+              {s.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="space-y-4">{step.content}</div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={goPrev}
+          disabled={current === 0}
+        >
+          Anterior
+        </Button>
+
+        {!isLast ? (
+          <Button
+            className="cursor-pointer"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              goNext();
+            }}
+          >
+            Siguiente
+          </Button>
+        ) : (
+          <Button type="submit" className="cursor-pointer">
+            Enviar
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** ----------------------------------------------------------------------
+ * Configuración de secciones (arrays de campos)
+ * ------------------------------------------------------------------- */
+
+// Verbales → Número de Consultas
+const VERBALES_FIELDS = [
+  { name: "numcvm", label: "Masculino" },
+  { name: "numcvf", label: "Femenino" },
+  { name: "numcvtm", label: "Trans Masculino" },
+  { name: "numcvtf", label: "Trans Femenino" },
+  { name: "numcvnb", label: "No binarias" },
+  { name: "numcvlg", label: "LGTBIQ+" },
+  { name: "numcvin", label: "Intersexual" },
+] as const;
+
+// Conminación a Dar Cumplimiento al Procedimiento de Acoso Laboral → Número de Consultas
+const CONMINACION_FIELDS = [
+  { name: "numcpm", label: "Masculino" },
+  { name: "numcpf", label: "Femenino" },
+  { name: "numcptm", label: "Trans Masculino" },
+  { name: "numcptf", label: "Trans Femenino" },
+  { name: "numcpnb", label: "No binarias" },
+  { name: "numcplg", label: "LGTBIQ+" },
+  { name: "numcpin", label: "Intersexual" },
+] as const;
+
+// Querellas remitidas a PIVC → Número de Consultas
+const PIVC_FIELDS = [
+  { name: "numqrm", label: "Masculino" },
+  { name: "numqrf", label: "Femenino" },
+  { name: "numqrtm", label: "Trans Masculino" },
+  { name: "numqrtf", label: "Trans Femenino" },
+  { name: "numqrnb", label: "No binarias" },
+  { name: "numqrlg", label: "LGTBIQ+" },
+  { name: "numqrin", label: "Intersexual" },
+] as const;
+
+/** ----------------------------------------------------------------------
+ * Componente principal: ReportForm (Wizard)
+ * ------------------------------------------------------------------- */
 export default function ReportForm({
   form,
 }: {
   form: UseFormReturn<ReportFormValues>;
 }) {
-  return (
-    <>
-      <div>
+  /** Paso 1: Filtros */
+  const stepFiltros: WizardStep = {
+    id: "filtros",
+    title: "Filtros",
+    description: "Selecciona territorial, año y mes",
+    fields: ["territorial", "anio", "mes"],
+    content: (
+      <>
         <FormField
           control={form.control}
           name="territorial"
@@ -154,486 +396,133 @@ export default function ReportForm({
             </FormItem>
           )}
         />
-      </div>
-      <Separator className="my-4" />
+      </>
+    ),
+  };
 
-      <h2 className="text-lg">Verbales</h2>
-      <h3 className="text-gray-600 dark:text-gray-400">Número de Consultas</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <FormField
-          control={form.control}
-          name="numcvm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+  /** Paso 2: Verbales */
+  const stepVerbales: WizardStep = {
+    id: "verbales",
+    title: "Verbales",
+    description: "Número de Consultas",
+    fields: VERBALES_FIELDS.map((f) => f.name),
+    content: (
+      <>
+        <h2 className="text-lg">Verbales</h2>
+        <h3 className="text-gray-600 dark:text-gray-400">
+          Número de Consultas
+        </h3>
 
-        <FormField
-          control={form.control}
-          name="numcvf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {VERBALES_FIELDS.map(({ name, label }) => (
+            <FormField
+              key={name}
+              control={form.control}
+              name={name as any}
+              render={({ field }) => (
+                <NumberField field={field} label={label} required min={0} />
+              )}
+            />
+          ))}
+        </div>
 
-        <FormField
-          control={form.control}
-          name="numcvtm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+        <SectionTotal
+          form={form}
+          names={VERBALES_FIELDS.map((f) => f.name)}
+          label="Total consultas verbales"
         />
+      </>
+    ),
+  };
 
-        <FormField
-          control={form.control}
-          name="numcvtf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+  /** Paso 3: Conminación (Acoso Laboral) */
+  const stepConminacion: WizardStep = {
+    id: "conminacion",
+    title: "Conminación Procedimiento de Acoso",
+    description: "Número de Consultas",
+    fields: CONMINACION_FIELDS.map((f) => f.name),
+    content: (
+      <>
+        <h2 className="text-lg">
+          Conminación a Dar Cumplimiento al Procedimiento de Acoso Laboral
+        </h2>
+        <h3 className="text-gray-600 dark:text-gray-400">
+          Número de Consultas
+        </h3>
 
-        <FormField
-          control={form.control}
-          name="numcvnb"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                No binarias<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {CONMINACION_FIELDS.map(({ name, label }) => (
+            <FormField
+              key={name}
+              control={form.control}
+              name={name as any}
+              render={({ field }) => (
+                <NumberField field={field} label={label} required min={0} />
+              )}
+            />
+          ))}
+        </div>
 
-        <FormField
-          control={form.control}
-          name="numcvlg"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                LGTBIQ+<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+        <SectionTotal
+          form={form}
+          names={CONMINACION_FIELDS.map((f) => f.name)}
+          label="Total consultas (Conminación)"
         />
+      </>
+    ),
+  };
 
-        <FormField
-          control={form.control}
-          name="numcvin"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Intersexual<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+  /** Paso 4: PIVC */
+  const stepPIVC: WizardStep = {
+    id: "pivc",
+    title: "Querellas remitidas a PIVC",
+    description: "Número de Consultas",
+    fields: PIVC_FIELDS.map((f) => f.name),
+    content: (
+      <>
+        <h2 className="text-lg">Querellas remitidas a PIVC</h2>
+        <h3 className="text-gray-600 dark:text-gray-400">
+          Número de Consultas
+        </h3>
 
-      <Separator className="my-4" />
-      <h2 className="text-lg">
-        Conminación a Dar Cumplimiento al Procedimiento de Acoso Laboral
-      </h2>
-      <h3 className="text-gray-600 dark:text-gray-400">Número de Consultas</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <FormField
-          control={form.control}
-          name="numcpm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {PIVC_FIELDS.map(({ name, label }) => (
+            <FormField
+              key={name}
+              control={form.control}
+              name={name as any}
+              render={({ field }) => (
+                <NumberField field={field} label={label} required min={0} />
+              )}
+            />
+          ))}
+        </div>
 
-        <FormField
-          control={form.control}
-          name="numcpf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+        <SectionTotal
+          form={form}
+          names={PIVC_FIELDS.map((f) => f.name)}
+          label="Total consultas (PIVC)"
         />
+      </>
+    ),
+  };
 
-        <FormField
-          control={form.control}
-          name="numcptm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+  const steps: WizardStep[] = [
+    stepFiltros,
+    stepVerbales,
+    stepConminacion,
+    stepPIVC,
+  ];
 
-        <FormField
-          control={form.control}
-          name="numcptf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+  /** Validación por paso (solo los campos del paso actual) */
+  const validateStep = async (fields: string[]) => {
+    const ok = await form.trigger(fields, { shouldFocus: true });
+    return ok;
+  };
 
-        <FormField
-          control={form.control}
-          name="numcpnb"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                No binarias<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numcplg"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                LGTBIQ+<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numcpin"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Intersexual<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
-      <Separator className="my-4" />
-      <h2 className="text-lg"> Querellas remitidas a PIVC </h2>
-      <h3 className="text-gray-600 dark:text-gray-400">Número de Consultas</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <FormField
-          control={form.control}
-          name="numqrm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrtm"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Masculino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrtf"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Trans Femenino<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrnb"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                No binarias<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrlg"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                LGTBIQ+<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="numqrin"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Intersexual<span className="text-red-500">*</span>
-              </FormLabel>
-              <FormControl>
-                <input
-                  placeholder="Ingrese un valor"
-                  type="number"
-                  value={field.value ?? 0}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                  className="input input-bordered w-full rounded-md border px-3 py-2 placeholder:text-sm"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-    </>
+  return (
+    <div className="mt-2">
+      <Wizard steps={steps} onValidateStep={validateStep} />
+    </div>
   );
 }
