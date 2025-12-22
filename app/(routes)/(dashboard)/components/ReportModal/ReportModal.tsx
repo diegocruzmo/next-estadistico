@@ -3,10 +3,8 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -19,36 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import ReportForm from "./ReportForm";
 import { useState } from "react";
-
-export const formSchema = z.object({
-  territorial: z.string().min(1, "Campo obligatorio"),
-  mes: z.string().min(1, "Campo obligatorio"),
-  anio: z.string().min(1, "Campo obligatorio"),
-
-  numcvm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvtm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvtf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvnb: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvlg: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcvin: z.number().min(0, "Debe ser igual o mayor a 0"),
-
-  numcpm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcpf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcptm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcptf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcpnb: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcplg: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numcpin: z.number().min(0, "Debe ser igual o mayor a 0"),
-
-  numqrm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrtm: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrtf: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrnb: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrlg: z.number().min(0, "Debe ser igual o mayor a 0"),
-  numqrin: z.number().min(0, "Debe ser igual o mayor a 0"),
-});
+import { formSchema } from "@/lib/validators/report";
 
 export type ReportFormValues = z.infer<typeof formSchema>;
 
@@ -106,7 +75,18 @@ export default function ReportModal() {
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit((values) => {
+            onSubmit={form.handleSubmit(async (values) => {
+              const res = await fetch("/api/reportes", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(values),
+              });
+
+              if (!res.ok) {
+                throw new Error("Error al guardar el reporte");
+              }
               console.log(values);
               setOpen(false);
               form.reset();

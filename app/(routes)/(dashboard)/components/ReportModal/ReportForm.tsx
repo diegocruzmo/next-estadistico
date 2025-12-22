@@ -21,7 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { formSchema } from "./ReportModal";
+import { formSchema } from "@/lib/validators/report";
 
 type ReportFormValues = z.infer<typeof formSchema>;
 
